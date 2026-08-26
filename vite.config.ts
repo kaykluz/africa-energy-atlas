@@ -24,11 +24,21 @@ export default defineConfig(({ command, isPreview }) => ({
     ...(command === "build" || isPreview
       ? [
           nitro({
-            // Cloudflare Workers. The preset externalises `cloudflare:workers`
-            // (how `src/lib/env.server.ts` reaches bindings), turns on
-            // `nodejs_compat`, and merges the root `wrangler.jsonc` — where the
-            // D1 binding is declared — into the generated deploy config.
-            preset: "cloudflare-module",
+            // Cloudflare Pages by default. Both Cloudflare presets externalise
+            // `cloudflare:workers` (how `src/lib/env.server.ts` reaches
+            // bindings), turn on `nodejs_compat`, and merge the root
+            // `wrangler.jsonc` — where the D1 binding is declared — into the
+            // generated deploy config.
+            //
+            // Pages rather than Workers because a Pages custom domain on a
+            // SUBDOMAIN does not require the domain to be a Cloudflare zone: it
+            // is a CNAME to `<project>.pages.dev` from whatever DNS provider
+            // already holds the zone. A Workers Custom Domain would require
+            // moving the domain's nameservers to Cloudflare, which would drag
+            // the apex, MX and SPF records along with it.
+            //
+            // Set NITRO_PRESET=cloudflare-module to build a Worker instead.
+            preset: process.env.NITRO_PRESET ?? "cloudflare-pages",
           }),
         ]
       : []),

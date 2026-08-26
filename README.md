@@ -33,7 +33,7 @@ Dataset licence: [CC BY 4.0](https://github.com/kaykluz/africa-energy-software-m
 ## Project
 
 - Live map: [map.kaykluz.com](https://map.kaykluz.com)
-- Hosting: Cloudflare Workers + D1 (see Deploying below)
+- Hosting: Cloudflare Pages + D1 (see Deploying below)
 - Notes: [kaykluz.com](https://kaykluz.com)
 - Source dataset: [africa-energy-software-map](https://github.com/kaykluz/africa-energy-software-map)
 
@@ -55,17 +55,26 @@ open `/review` — deliberately, so the workspace can be tried without putting
 secrets in the repo. The deployed database never does this: an empty allowlist
 there admits nobody.
 
-To run the real Worker locally, build first and use wrangler:
+To run the real Cloudflare build locally, build first and use wrangler:
 
 ```bash
 npm run build
-npx wrangler dev --local --config .output/server/wrangler.json
+npm run pages:dev        # http://localhost:8788, with a local D1
 ```
 
 ## Deploying
 
-The app is a Cloudflare Worker. Nitro's `cloudflare-module` preset builds it and
-merges the root `wrangler.jsonc` into the generated deploy config.
+The app deploys to **Cloudflare Pages**, built by Nitro's `cloudflare-pages`
+preset. The root `wrangler.jsonc` is merged into the generated deploy config.
+
+Pages rather than Workers for one specific reason: a Pages custom domain on a
+**subdomain** does not require the domain to be a Cloudflare zone. A Workers
+Custom Domain does — it would mean moving the whole domain's nameservers to
+Cloudflare, dragging the apex, MX and SPF records along with it. On Pages the
+domain stays wherever its DNS already lives and only one CNAME record changes.
+
+(`NITRO_PRESET=cloudflare-module npm run build` still produces a Worker, if the
+zone ever does move to Cloudflare.)
 
 **1. Create the database** and paste the returned id into `wrangler.jsonc`:
 
@@ -76,34 +85,50 @@ npx wrangler d1 create africa-energy-atlas
 Migrations in `migrations/*.sql` are applied automatically on the first request
 after a deploy, so there is no separate migrate step.
 
-**2. Set the secrets:**
-
-```bash
-npx wrangler secret put BETTER_AUTH_SECRET     # openssl rand -hex 32
-npx wrangler secret put BETTER_AUTH_URL        # https://map.example.org
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put RESEND_API_KEY
-npx wrangler secret put EMAIL_FROM
-npx wrangler secret put REVIEWER_EMAILS        # comma-separated
-```
-
-See `.dev.vars.example` for what each one is. Google and Resend are independent:
-configure either and that sign-in method appears; configure neither and `/login`
-says so rather than showing a button that cannot work.
-
-In the Google Cloud console, the OAuth client's authorised redirect URI must be
-`<BETTER_AUTH_URL>/api/auth/callback/google`.
-
-**3. Deploy**, then attach the custom domain in the Cloudflare dashboard
-(Workers → your worker → Settings → Domains & Routes):
+**2. Deploy**, which creates the Pages project on first run:
 
 ```bash
 npm run deploy
 ```
 
-`BETTER_AUTH_URL` must match the final public hostname. If it doesn't, sign-in
-fails the origin check rather than silently half-working.
+**3. Bind D1 and set the secrets** on the project (Cloudflare dashboard →
+Workers & Pages → your project → Settings), or from the CLI:
+
+```bash
+npx wrangler pages secret put BETTER_AUTH_SECRET     # openssl rand -hex 32
+npx wrangler pages secret put BETTER_AUTH_URL        # https://map.example.org
+npx wrangler pages secret put GOOGLE_CLIENT_ID
+npx wrangler pages secret put GOOGLE_CLIENT_SECRET
+npx wrangler pages secret put RESEND_API_KEY
+npx wrangler pages secret put EMAIL_FROM
+npx wrangler pages secret put REVIEWER_EMAILS        # comma-separated
+```
+
+Note `wrangler pages secret`, not `wrangler secret` — that one is for Workers.
+Bind the D1 database as `DB` under Settings → Bindings.
+
+See `.dev.vars.example` for what each value is. Google and Resend are
+independent: configure either and that sign-in method appears; configure
+neither and `/login` says so rather than showing a button that cannot work.
+
+In the Google Cloud console, the OAuth client's authorised redirect URI must be
+`BETTER_AUTH_URL` followed by `/api/auth/callback/google`.
+
+**4. Attach the custom domain.** In the Pages project → Custom domains → Set up
+a custom domain, enter the subdomain (e.g. `map.example.org`). Cloudflare shows
+the CNAME target; add it at whatever DNS provider holds the zone:
+
+```
+map    CNAME    <your-project>.pages.dev
+```
+
+Only that one record changes — the apex, MX and TXT records are untouched. The
+dashboard step is required: adding the CNAME alone, without registering the
+domain in Pages, returns a 522.
+
+Finally set `BETTER_AUTH_URL` to the custom hostname, add the matching Google
+redirect URI, and redeploy. `BETTER_AUTH_URL` must match the final public
+hostname, or sign-in fails the origin check rather than silently half-working.
 
 ## Editor access
 

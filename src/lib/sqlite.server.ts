@@ -155,9 +155,10 @@ async function resolveRunner(): Promise<Resolved> {
     // Falling through to `node:sqlite` here would surface as an unenv
     // "not implemented" stack with nothing pointing at the real cause.
     throw new Error(
-      "No D1 binding named `DB` is attached to this Worker. Create the database " +
-        "(`wrangler d1 create africa-energy-atlas`) and put the returned " +
-        "`database_id` into wrangler.jsonc, then redeploy.",
+      "No D1 binding named `DB` is attached to this deployment. Create the " +
+        "database (`wrangler d1 create africa-energy-atlas`), then bind it as " +
+        "`DB` — on Pages under Settings → Bindings, or via `database_id` in " +
+        "wrangler.jsonc — and redeploy.",
     );
   }
   return nodeRunner();
