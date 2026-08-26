@@ -10,14 +10,19 @@
   "compatibility_date": "2025-07-13",
 
   // The contribution queue, editorial audit trail and Better Auth's identity
-  // tables. `database_id` comes from `wrangler d1 create` — see the README.
-  // On Pages this binding is also settable in the dashboard under
+  // tables. Created in WEUR — the closest D1 region to African traffic, and
+  // pinned explicitly so the location is not decided by wherever the first
+  // write happens to originate (a CI runner, typically US).
+  //
+  // A database_id is an identifier, not a credential: using it still requires
+  // an API token, which is why Cloudflare's own docs keep it in version
+  // control. On Pages this binding is also settable in the dashboard under
   // Settings → Bindings, which is what the deployed project actually reads.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "africa-energy-atlas",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "a2985853-cb0f-420b-b175-fc443916c147"
     }
   ],
 

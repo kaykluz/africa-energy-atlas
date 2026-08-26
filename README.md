@@ -76,14 +76,18 @@ domain stays wherever its DNS already lives and only one CNAME record changes.
 (`NITRO_PRESET=cloudflare-module npm run build` still produces a Worker, if the
 zone ever does move to Cloudflare.)
 
-**1. Create the database** and paste the returned id into `wrangler.jsonc`:
+**1. The database already exists.** `africa-energy-atlas`
+(`a2985853-cb0f-420b-b175-fc443916c147`, WEUR) is created and its schema is
+applied, and `wrangler.jsonc` already carries the id. To recreate it from
+scratch:
 
 ```bash
 npx wrangler d1 create africa-energy-atlas
 ```
 
 Migrations in `migrations/*.sql` are applied automatically on the first request
-after a deploy, so there is no separate migrate step.
+after a deploy, so there is no separate migrate step — a fresh database needs
+nothing but the binding.
 
 **2. Deploy**, which creates the Pages project on first run:
 
