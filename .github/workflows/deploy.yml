@@ -1,0 +1,45 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  # Every merge to main ships.
+  push:
+    branches: [main]
+  # …and a deploy can be triggered by hand from the Actions tab.
+  workflow_dispatch:
+
+# Never let two deploys race to the same project.
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          # Both are repository secrets — Settings → Secrets and variables →
+          # Actions. The token needs the "Cloudflare Pages — Edit" permission.
+          #
+          # The Pages PROJECT must already exist: `pages deploy` cannot create
+          # one non-interactively and fails with "Project not found". Create it
+          # once (see README → Deploying), after which every run lands on it.
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=africa-energy-atlas

@@ -33,5 +33,138 @@ Dataset licence: [CC BY 4.0](https://github.com/kaykluz/africa-energy-software-m
 ## Project
 
 - Live map: [map.kaykluz.com](https://map.kaykluz.com)
+- Hosting: Cloudflare Pages + D1 (see Deploying below)
 - Notes: [kaykluz.com](https://kaykluz.com)
 - Source dataset: [africa-energy-software-map](https://github.com/kaykluz/africa-energy-software-map)
+
+## Running it
+
+Requires Node 22.13+.
+
+```bash
+npm install
+npm run dev          # http://localhost:8080
+```
+
+`vite dev` has no Cloudflare bindings, so the app falls back to a local SQLite
+file at `.data/atlas.sqlite` (via `node:sqlite`). Same dialect as production,
+so schema behaviour matches. Delete the file to start clean.
+
+With no `REVIEWER_EMAILS` set, that local database lets any signed-in account
+open `/review` — deliberately, so the workspace can be tried without putting
+secrets in the repo. The deployed database never does this: an empty allowlist
+there admits nobody.
+
+To run the real Cloudflare build locally, build first and use wrangler:
+
+```bash
+npm run build
+npm run pages:dev        # http://localhost:8788, with a local D1
+```
+
+## Deploying
+
+The app deploys to **Cloudflare Pages**, built by Nitro's `cloudflare-pages`
+preset. The root `wrangler.jsonc` is merged into the generated deploy config.
+
+Pages rather than Workers for one specific reason: a Pages custom domain on a
+**subdomain** does not require the domain to be a Cloudflare zone. A Workers
+Custom Domain does — it would mean moving the whole domain's nameservers to
+Cloudflare, dragging the apex, MX and SPF records along with it. On Pages the
+domain stays wherever its DNS already lives and only one CNAME record changes.
+
+(`NITRO_PRESET=cloudflare-module npm run build` still produces a Worker, if the
+zone ever does move to Cloudflare.)
+
+**1. The database already exists.** `africa-energy-atlas`
+(`a2985853-cb0f-420b-b175-fc443916c147`, WEUR) is created and its schema is
+applied, and `wrangler.jsonc` already carries the id. To recreate it from
+scratch:
+
+```bash
+npx wrangler d1 create africa-energy-atlas
+```
+
+Migrations in `migrations/*.sql` are applied automatically on the first request
+after a deploy, so there is no separate migrate step — a fresh database needs
+nothing but the binding.
+
+**2. Deploy**, which creates the Pages project on first run:
+
+```bash
+npm run deploy
+```
+
+The first run creates the Pages project, and has to be interactive — `wrangler
+pages deploy` cannot create a project non-interactively, and fails with
+"Project not found".
+
+After that project exists there are two ways to keep shipping, and only one is
+needed:
+
+- **Cloudflare Git integration** (simplest): in the dashboard, connect this
+  repository to the Pages project with build command `npm run build` and output
+  directory `dist`. No tokens, no GitHub secrets — Cloudflare builds on push.
+- **GitHub Actions**: add `CLOUDFLARE_API_TOKEN` (needs the *Cloudflare Pages —
+  Edit* permission) and `CLOUDFLARE_ACCOUNT_ID` under Settings → Secrets and
+  variables → Actions. `.github/workflows/deploy.yml` then ships every merge to
+  `main`, and can be run by hand from the Actions tab.
+
+**3. Bind D1 and set the secrets** on the project (Cloudflare dashboard →
+Workers & Pages → your project → Settings), or from the CLI:
+
+```bash
+npx wrangler pages secret put BETTER_AUTH_SECRET     # openssl rand -hex 32
+npx wrangler pages secret put BETTER_AUTH_URL        # https://map.example.org
+npx wrangler pages secret put GOOGLE_CLIENT_ID
+npx wrangler pages secret put GOOGLE_CLIENT_SECRET
+npx wrangler pages secret put RESEND_API_KEY
+npx wrangler pages secret put EMAIL_FROM
+npx wrangler pages secret put REVIEWER_EMAILS        # comma-separated
+```
+
+Note `wrangler pages secret`, not `wrangler secret` — that one is for Workers.
+Bind the D1 database as `DB` under Settings → Bindings.
+
+See `.dev.vars.example` for what each value is. Google and Resend are
+independent: configure either and that sign-in method appears; configure
+neither and `/login` says so rather than showing a button that cannot work.
+
+In the Google Cloud console, the OAuth client's authorised redirect URI must be
+`BETTER_AUTH_URL` followed by `/api/auth/callback/google`.
+
+**4. Attach the custom domain.** In the Pages project → Custom domains → Set up
+a custom domain, enter the subdomain (e.g. `map.example.org`). Cloudflare shows
+the CNAME target; add it at whatever DNS provider holds the zone:
+
+```
+map    CNAME    <your-project>.pages.dev
+```
+
+Only that one record changes — the apex, MX and TXT records are untouched. The
+dashboard step is required: adding the CNAME alone, without registering the
+domain in Pages, returns a 522.
+
+Finally set `BETTER_AUTH_URL` to the custom hostname, add the matching Google
+redirect URI, and redeploy. `BETTER_AUTH_URL` must match the final public
+hostname, or sign-in fails the origin check rather than silently half-working.
+
+## Editor access
+
+`/review` is the private workspace. It is not linked from the map, search,
+footer or contribute form, and is `noindex`.
+
+- Sign in with **Google**, or with an emailed **magic link** (single use,
+  expires in 15 minutes).
+- Only addresses in `REVIEWER_EMAILS` get in. That list lives in the Cloudflare
+  environment, never in this repository — cloning the source cannot open the
+  live workspace.
+- Magic links are only *sent* to allowlisted addresses, so the form cannot be
+  used to mail strangers. It reports success either way, so it cannot be used to
+  test who is an editor.
+- Email/password is disabled outright, so nobody can register an account on an
+  allowlisted address.
+
+Public contribution stays anonymous: honeypot, hashed-IP rate limit, same-site
+requests only, public http(s) URLs only. Submissions land as `received`, and
+there is no public read, update or delete of the queue.

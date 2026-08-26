@@ -1,31 +1,25 @@
 /**
- * The upstream identity providers this app offers for sign-in (via the broker).
+ * The sign-in methods this app offers.
  *
- * Source of truth for BOTH the server (`server.ts`, one `genericOAuth` provider
- * per entry) and the client (`client.ts` / sign-in buttons). Kept in its own
- * dependency-free module so the client can import it without pulling the
- * server-only Better Auth instance (and `pg`) into the browser bundle.
+ * Source of truth for BOTH the server (`server.ts`) and the client
+ * (`client.ts` / the sign-in form). Kept dependency-free so the client can
+ * import it without pulling the server-only Better Auth instance in with it.
  *
- * Each app federates to the shared **auth broker** (`GROK_AUTH_ISSUER`), which
- * holds the real Google/X secrets. The app never sees them — it only knows its
- * own per-app client id/secret and which upstream to ask the broker for (`idp`).
- *
- * To add an upstream (e.g. GitHub) once the broker supports it: add one entry
- * here (`{ providerId: "grok-github", idp: "github", label: "GitHub" }`). The
- * `providerId` is this app's local id and the OAuth callback path segment
- * (`/api/auth/oauth2/callback/<providerId>`); `idp` is the hint the broker reads
- * to pick the upstream (Better Auth's id for X is still `twitter`).
+ * Every method here runs against credentials THIS project owns — a Google OAuth
+ * client in the site owner's Google Cloud project, and a Resend API key on the
+ * site owner's domain. There is no third-party identity broker in the path.
  */
-export type GrokProvider = {
-  /** This app's local provider id; also the callback path segment. */
-  providerId: string;
-  /** Upstream hint the broker forwards to (Better Auth social id). */
-  idp: string;
+
+export type SocialProvider = {
+  /** Better Auth's social provider id; also the callback path segment. */
+  providerId: "google";
   /** Human label for the sign-in button. */
   label: string;
 };
 
-export const GROK_PROVIDERS: readonly GrokProvider[] = [
-  { providerId: "grok-google", idp: "google", label: "Google" },
-  { providerId: "grok-x", idp: "twitter", label: "X" },
+export const SOCIAL_PROVIDERS: readonly SocialProvider[] = [
+  { providerId: "google", label: "Google" },
 ];
+
+/** How long a magic link stays valid. Mirrored in the email copy. */
+export const MAGIC_LINK_MINUTES = 15;

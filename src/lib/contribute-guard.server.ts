@@ -57,14 +57,16 @@ export function isSafePublicHttpUrl(raw: string): boolean {
 export async function enforceContributeRateLimit(): Promise<void> {
   const sql = await getSql();
   const hash = ipHash(clientIp());
+  // Timestamps are stored as ISO-8601 text, so lexical comparison IS
+  // chronological comparison — no cast needed, and it uses the index.
   const cutoff = new Date(Date.now() - WINDOW_MS).toISOString();
-  await sql`delete from contribution_submit_events where created_at < ${cutoff}::timestamptz`;
+  await sql`delete from contribution_submit_events where created_at < ${cutoff}`;
   const rows = await sql<{ n: number }>`
-    select count(*)::int as n
+    select count(*) as n
     from contribution_submit_events
-    where ip_hash = ${hash} and created_at >= ${cutoff}::timestamptz
+    where ip_hash = ${hash} and created_at >= ${cutoff}
   `;
-  const n = rows[0]?.n ?? 0;
+  const n = Number(rows[0]?.n ?? 0);
   if (n >= MAX_SUBMITS) {
     throw new Error("Too many submissions from this network. Try again in a few minutes.");
   }

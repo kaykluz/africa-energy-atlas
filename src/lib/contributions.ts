@@ -182,12 +182,13 @@ export const getEditorSession = createServerFn({ method: "GET" })
       await import("@/lib/editor-allowlist.server");
     const email = context.email;
     const signedIn = Boolean(context.userId);
-    const isEditor = signedIn && isAllowedEditor(email);
+    const isEditor = signedIn && (await isAllowedEditor(email));
     return {
       signedIn,
       isEditor,
-      email: isEditor ? email : signedIn ? email : null,
-      previewOpenGate: isEditor && isEphemeralPreview() && !isAllowlistConfigured(),
+      email: signedIn ? email : null,
+      previewOpenGate:
+        isEditor && (await isEphemeralPreview()) && !(await isAllowlistConfigured()),
     };
   });
 
@@ -267,7 +268,7 @@ export const decideContribution = createServerFn({ method: "POST" })
         version = ${nextVersion},
         reviewed_by_user_id = ${context.userId},
         reviewed_by_email = ${actorEmail},
-        reviewed_at = ${now}::timestamptz
+        reviewed_at = ${now}
       where id = ${data.id} and version = ${data.version}
     `;
 
