@@ -36,6 +36,10 @@ jobs:
         with:
           # Both are repository secrets — Settings → Secrets and variables →
           # Actions. The token needs the "Cloudflare Pages — Edit" permission.
+          #
+          # The Pages PROJECT must already exist: `pages deploy` cannot create
+          # one non-interactively and fails with "Project not found". Create it
+          # once (see README → Deploying), after which every run lands on it.
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=africa-energy-atlas

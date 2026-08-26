@@ -95,10 +95,20 @@ nothing but the binding.
 npm run deploy
 ```
 
-Or let GitHub do it: add `CLOUDFLARE_API_TOKEN` (needs the *Cloudflare Pages —
-Edit* permission) and `CLOUDFLARE_ACCOUNT_ID` under Settings → Secrets and
-variables → Actions. `.github/workflows/deploy.yml` then ships every merge to
-`main`, and can be run by hand from the Actions tab.
+The first run creates the Pages project, and has to be interactive — `wrangler
+pages deploy` cannot create a project non-interactively, and fails with
+"Project not found".
+
+After that project exists there are two ways to keep shipping, and only one is
+needed:
+
+- **Cloudflare Git integration** (simplest): in the dashboard, connect this
+  repository to the Pages project with build command `npm run build` and output
+  directory `dist`. No tokens, no GitHub secrets — Cloudflare builds on push.
+- **GitHub Actions**: add `CLOUDFLARE_API_TOKEN` (needs the *Cloudflare Pages —
+  Edit* permission) and `CLOUDFLARE_ACCOUNT_ID` under Settings → Secrets and
+  variables → Actions. `.github/workflows/deploy.yml` then ships every merge to
+  `main`, and can be run by hand from the Actions tab.
 
 **3. Bind D1 and set the secrets** on the project (Cloudflare dashboard →
 Workers & Pages → your project → Settings), or from the CLI:
