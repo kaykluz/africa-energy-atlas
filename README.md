@@ -108,7 +108,9 @@ needed:
 - **GitHub Actions**: add `CLOUDFLARE_API_TOKEN` (needs the *Cloudflare Pages —
   Edit* permission) and `CLOUDFLARE_ACCOUNT_ID` under Settings → Secrets and
   variables → Actions. `.github/workflows/deploy.yml` then ships every merge to
-  `main`, and can be run by hand from the Actions tab.
+  `main`, and can be run by hand from the Actions tab. Until those secrets
+  exist the deploy job **skips** with a notice rather than failing, so an
+  unconfigured deploy never shows up as a broken `main`.
 
 **3. Bind D1 and set the secrets** on the project (Cloudflare dashboard →
 Workers & Pages → your project → Settings), or from the CLI:
