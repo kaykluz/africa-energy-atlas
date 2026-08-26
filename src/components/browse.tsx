@@ -15,6 +15,7 @@ import {
 import { cn, initials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useMergedCompanies, useMergedSoftware } from "@/components/accepted-catalog";
 
 function hay(s: string) {
   return s.toLowerCase();
@@ -42,9 +43,10 @@ export function SoftwareGrid({
   onOpen: (slug: string) => void;
 }) {
   const [limit, setLimit] = useState(36);
+  const mergedSoftware = useMergedSoftware(allSoftware);
   const filtered = useMemo(() => {
     const q = hay(query ?? "");
-    return allSoftware
+    return mergedSoftware
       .filter((s) => (reviewedOnly ? s.reviewed : true))
       .filter((s) => (stageId ? s.stageIds.includes(stageId) : true))
       .filter((s) => (relationship ? s.relationship === relationship : true))
@@ -54,7 +56,7 @@ export function SoftwareGrid({
           : true,
       )
       .sort((a, b) => Number(b.reviewed) - Number(a.reviewed) || a.name.localeCompare(b.name));
-  }, [query, stageId, relationship, reviewedOnly]);
+  }, [query, stageId, relationship, reviewedOnly, mergedSoftware]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -136,7 +138,9 @@ function SoftwareCard({ item, onOpen }: { item: Software; onOpen: (slug: string)
             <h3 className="truncate font-semibold leading-tight">{item.name}</h3>
           </div>
           <p className="truncate text-sm text-muted">
-            {item.companyName || (item.reviewed ? "Reviewed" : "Catalogue")}
+            {item.kind === "community_accepted"
+              ? "Editor accepted"
+              : item.companyName || (item.reviewed ? "Reviewed" : "Catalogue")}
           </p>
         </div>
       </div>
@@ -174,10 +178,11 @@ export function CompanyGrid({
   onOpen: (slug: string) => void;
 }) {
   const [limit, setLimit] = useState(36);
+  const mergedCompanies = useMergedCompanies(allCompanies);
   const filtered = useMemo(() => {
     const q = hay(query ?? "");
     const roleId = role ?? "software";
-    return allCompanies
+    return mergedCompanies
       .filter((c) => (roleId === "all" ? true : c.role === roleId || c.roles.includes(roleId)))
       .filter((c) => (q ? hay(`${c.name} ${c.summary} ${c.role}`).includes(q) : true))
       .sort(
@@ -186,7 +191,7 @@ export function CompanyGrid({
           (b.tier === "reviewed" ? 1 : 0) - (a.tier === "reviewed" ? 1 : 0) ||
           a.name.localeCompare(b.name),
       );
-  }, [query, role]);
+  }, [query, role, mergedCompanies]);
 
   const activeRole = role ?? "software";
 
@@ -257,11 +262,16 @@ function CompanyCard({ item, onOpen }: { item: Company; onOpen: (slug: string) =
         )}
         <div className="min-w-0">
           <h3 className="truncate font-semibold leading-tight">{item.name}</h3>
-          <p className="text-sm text-muted">{ROLE_LABEL[item.role] || item.role}</p>
+          <p className="truncate text-sm text-muted">
+            {item.origin === "community"
+              ? "Editor accepted"
+              : ROLE_LABEL[item.role] || item.role}
+          </p>
         </div>
       </div>
       <p className="mt-3 line-clamp-2 text-sm text-ink/80">{item.summary || "Energy-sector organisation."}</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
+        {item.origin === "community" ? <Badge tone="ok">Editor accepted</Badge> : null}
         {item.hq ? <Badge tone="quiet">{countryName(item.hq) || item.hq}</Badge> : null}
         {item.productIds.length ? (
           <Badge tone="quiet">

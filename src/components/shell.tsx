@@ -7,6 +7,8 @@ import { catalog } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SearchPalette } from "@/components/search-palette";
+import { UserButton } from "@/lib/auth/gates";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 const NAV = [
   { to: "/", label: "Map", search: { view: "map" as const } },
@@ -16,6 +18,44 @@ const NAV = [
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname === "/review" || pathname === "/login") {
+    return <EditorShell>{children}</EditorShell>;
+  }
+  return <PublicShell>{children}</PublicShell>;
+}
+
+function EditorShell({ children }: { children: ReactNode }) {
+  const { user, isPending } = useCurrentUserState();
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md">
+        <div className="mx-auto flex h-[68px] max-w-[1200px] items-center justify-between gap-3 px-3 sm:px-5">
+          <Link to="/" className="flex items-center gap-2.5">
+            <span className="mark-disc size-9 text-[0.7rem]">Ae</span>
+            <span className="leading-tight">
+              <span className="block text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted">
+                Editor workspace
+              </span>
+              <span className="block font-display text-[1.05rem] font-medium tracking-[-0.03em]">
+                Not linked from the map
+              </span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-3">
+            {isPending ? <div className="h-8 w-28 animate-pulse rounded-full bg-sunken" /> : user ? <UserButton /> : null}
+            <Link to="/" className="text-sm font-semibold text-muted hover:text-ink">
+              Public map
+            </Link>
+          </div>
+        </div>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+    </div>
+  );
+}
+
+function PublicShell({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -92,7 +132,9 @@ export function Shell({ children }: { children: ReactNode }) {
               </kbd>
             </button>
             <Button asChild size="sm" className="hidden sm:inline-flex">
-              <Link to="/contribute" search={{ kind: undefined, about: undefined }}>Contribute</Link>
+              <Link to="/contribute" search={{ kind: undefined, about: undefined }}>
+                Contribute
+              </Link>
             </Button>
             <button
               type="button"

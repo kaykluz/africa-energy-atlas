@@ -11,6 +11,8 @@ import {
   type Software,
 } from "@/lib/catalog";
 import { cn, initials } from "@/lib/utils";
+import { useAcceptedCatalog } from "@/components/accepted-catalog";
+import { mergeBySlug } from "@/lib/accepted-records";
 
 function SoftwareChip({
   item,
@@ -35,6 +37,8 @@ function SoftwareChip({
         </span>
         {item.companyName ? (
           <span className="block truncate text-[0.68rem] text-muted">{item.companyName}</span>
+        ) : item.kind === "community_accepted" ? (
+          <span className="block truncate text-[0.68rem] text-muted">Editor accepted</span>
         ) : null}
       </span>
     </button>
@@ -54,9 +58,11 @@ export function ValueChain({
   onFunction: (id: string | undefined) => void;
   onOpenSoftware: (slug: string) => void;
 }) {
+  const { software: extraSoftware } = useAcceptedCatalog();
+  const acceptedInStage = (id: string) => extraSoftware.filter((item) => item.stageIds.includes(id));
   const active = stageId && stageById.has(stageId) ? stageId : coreStages[0]?.id;
   const stage = stageById.get(active ?? "") ?? coreStages[0];
-  const items = softwareInStage(stage.id);
+  const items = mergeBySlug(softwareInStage(stage.id), acceptedInStage(stage.id));
   const fns = functionsForStage(stage.id)
     .map((fn) => ({
       ...fn,
@@ -74,7 +80,7 @@ export function ValueChain({
       <div className="shrink-0 overflow-x-auto border-b border-line px-3 py-3 sm:px-5">
         <div className="flex min-w-max gap-1.5">
           {coreStages.map((st, i) => {
-            const count = softwareInStage(st.id).length;
+            const count = mergeBySlug(softwareInStage(st.id), acceptedInStage(st.id)).length;
             const isOn = st.id === stage.id;
             return (
               <button

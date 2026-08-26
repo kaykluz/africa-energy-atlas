@@ -5,6 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Search, X } from "lucide-react";
 import { searchCatalog, type SearchHit } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { useAcceptedCatalog } from "@/components/accepted-catalog";
 
 export function SearchPalette({
   open,
@@ -16,7 +17,40 @@ export function SearchPalette({
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const hits = useMemo(() => searchCatalog(query, 18), [query]);
+  const { software: extraSoftware, companies: extraCompanies } = useAcceptedCatalog();
+  const hits = useMemo(() => {
+    const base = searchCatalog(query, 18);
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return base;
+    const extra: SearchHit[] = [];
+    for (const sw of extraSoftware) {
+      if (`${sw.name} ${sw.summary}`.toLowerCase().includes(q)) {
+        extra.push({
+          type: "software",
+          id: sw.id,
+          slug: sw.slug,
+          name: sw.name,
+          context: "Editor accepted",
+          href: `/software/${sw.slug}`,
+        });
+      }
+    }
+    for (const co of extraCompanies) {
+      if (`${co.name} ${co.summary}`.toLowerCase().includes(q)) {
+        extra.push({
+          type: "company",
+          id: co.id,
+          slug: co.slug,
+          name: co.name,
+          context: "Editor accepted",
+          href: `/companies/${co.slug}`,
+        });
+      }
+    }
+    if (!extra.length) return base;
+    const seen = new Set(base.map((hit) => `${hit.type}:${hit.slug}`));
+    return [...extra.filter((hit) => !seen.has(`${hit.type}:${hit.slug}`)), ...base].slice(0, 18);
+  }, [query, extraSoftware, extraCompanies]);
 
   useEffect(() => {
     if (open) {

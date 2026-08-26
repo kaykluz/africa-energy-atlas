@@ -6,7 +6,7 @@ export function Badge({
   tone = "default",
   ...props
 }: HTMLAttributes<HTMLSpanElement> & {
-  tone?: "default" | "primary" | "quiet" | "reviewed";
+  tone?: "default" | "primary" | "quiet" | "reviewed" | "ok";
 }) {
   return (
     <span
@@ -16,6 +16,7 @@ export function Badge({
         tone === "primary" && "bg-primary text-primary-ink",
         tone === "quiet" && "text-muted shadow-[inset_0_0_0_1px_var(--color-line)]",
         tone === "reviewed" && "bg-primary/12 text-primary",
+        tone === "ok" && "bg-ok/12 text-ok",
         className,
       )}
       {...props}

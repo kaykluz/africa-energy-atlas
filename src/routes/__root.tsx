@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { AcceptedCatalogProvider } from "@/components/accepted-catalog";
 import { Shell } from "@/components/shell";
 import appCss from "../styles.css?url";
 
@@ -36,9 +37,11 @@ export const Route = createRootRoute({
       <body className="bg-bg text-ink">
         <PreviewHostBridge />
         <AuthProvider>
-          <Shell>
-            <Outlet />
-          </Shell>
+          <AcceptedCatalogProvider>
+            <Shell>
+              <Outlet />
+            </Shell>
+          </AcceptedCatalogProvider>
         </AuthProvider>
         <Scripts />
       </body>

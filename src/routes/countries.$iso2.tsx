@@ -6,22 +6,34 @@ import {
   countryStatByIso,
   softwareInCountry,
 } from "@/lib/catalog";
+import { listAcceptedRecords, mergeBySlug } from "@/lib/accepted-records";
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/countries/$iso2")({
+  loader: async ({ params }) => {
+    const iso = params.iso2.toUpperCase();
+    const country = countryByIso.get(iso);
+    if (!country) throw notFound();
+    const extra = await listAcceptedRecords();
+    return {
+      extraSoftware: extra.software.filter((item) => item.countries.includes(iso)),
+      extraCompanies: extra.companies.filter((item) => item.countries.includes(iso) || item.hq === iso),
+    };
+  },
   component: CountryPage,
 });
 
 function CountryPage() {
   const { iso2 } = Route.useParams();
+  const { extraSoftware, extraCompanies } = Route.useLoaderData();
   const iso = iso2.toUpperCase();
   const country = countryByIso.get(iso);
   if (!country) throw notFound();
   const stat = countryStatByIso.get(iso);
-  const software = softwareInCountry(iso).sort(
+  const software = mergeBySlug(softwareInCountry(iso), extraSoftware).sort(
     (a, b) => Number(b.reviewed) - Number(a.reviewed) || a.name.localeCompare(b.name),
   );
-  const companies = companiesInCountry(iso).sort(
+  const companies = mergeBySlug(companiesInCountry(iso), extraCompanies).sort(
     (a, b) => (b.productIds.length || 0) - (a.productIds.length || 0) || a.name.localeCompare(b.name),
   );
 
@@ -37,7 +49,7 @@ function CountryPage() {
       <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-faint">{iso}</p>
       <h1 className="mt-1 font-display text-4xl font-medium tracking-[-0.03em] sm:text-5xl">{country.name}</h1>
       <p className="mt-3 text-muted">
-        {stat?.software ?? 0} named software locations · {stat?.companies ?? 0} companies
+        {software.length} named software locations · {companies.length} companies
         {stat?.deployments ? ` · ${stat.deployments} evidenced deployments` : ""}
       </p>
 
@@ -56,7 +68,9 @@ function CountryPage() {
                     {s.reviewed ? <i className="reviewed-dot" /> : null}
                     {s.name}
                   </span>
-                  <span className="mt-1 block text-sm text-muted">{s.companyName}</span>
+                  <span className="mt-1 block text-sm text-muted">
+                    {s.kind === "community_accepted" ? "Editor accepted" : s.companyName}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -84,7 +98,9 @@ function CountryPage() {
                 >
                   <span>
                     <span className="block font-semibold">{c.name}</span>
-                    <span className="text-sm text-muted">{ROLE_LABEL[c.role]}</span>
+                    <span className="text-sm text-muted">
+                      {c.origin === "community" ? "Editor accepted" : ROLE_LABEL[c.role]}
+                    </span>
                   </span>
                   {c.productIds.length ? <Badge tone="quiet">{c.productIds.length}</Badge> : null}
                 </Link>

@@ -5,29 +5,33 @@ import {
   countryName,
   evidenceLabel,
   functionName,
-  getSoftware,
   relatedSoftware,
   relationshipName,
   softwareDeployments,
   softwareSources,
   stageName,
 } from "@/lib/catalog";
+import { resolvePublicSoftware } from "@/lib/accepted-records";
 import { initials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/software/$slug")({
+  loader: async ({ params }) => {
+    const item = await resolvePublicSoftware({ data: params.slug });
+    if (!item) throw notFound();
+    return { item };
+  },
   component: SoftwarePage,
 });
 
 function SoftwarePage() {
-  const { slug } = Route.useParams();
-  const item = getSoftware(slug);
-  if (!item) throw notFound();
+  const { item } = Route.useLoaderData();
   const owner = item.companyId ? companyById.get(item.companyId) : undefined;
   const deps = softwareDeployments(item.id);
   const srcs = softwareSources(item);
   const related = relatedSoftware(item);
+  const community = item.kind === "community_accepted";
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
@@ -43,7 +47,7 @@ function SoftwarePage() {
         <span className="mark-disc size-16 text-lg">{initials(item.name)}</span>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-faint">
-            {item.reviewed ? "Reviewed product" : "Catalogue product"}
+            {community ? "Editor-accepted product" : item.reviewed ? "Reviewed product" : "Catalogue product"}
           </p>
           <h1 className="mt-1 font-display text-4xl font-medium tracking-[-0.03em] sm:text-5xl">{item.name}</h1>
           {owner ? (
@@ -61,7 +65,13 @@ function SoftwarePage() {
             {item.summary || "No summary yet."}
           </p>
           <div className="mt-4 flex flex-wrap gap-1.5">
-            {item.reviewed ? <Badge tone="reviewed">Reviewed</Badge> : <Badge tone="quiet">Catalogue</Badge>}
+            {community ? (
+              <Badge tone="ok">Editor accepted</Badge>
+            ) : item.reviewed ? (
+              <Badge tone="reviewed">Reviewed</Badge>
+            ) : (
+              <Badge tone="quiet">Catalogue</Badge>
+            )}
             {item.africaBuilt ? <Badge>Africa-built</Badge> : null}
             {item.relationship ? <Badge tone="quiet">{relationshipName(item.relationship)}</Badge> : null}
             {item.stageIds.map((id) => (
@@ -182,6 +192,13 @@ function SoftwarePage() {
                 {item.sourceUrl.replace(/^https?:\/\//, "")}
               </a>
             </section>
+          ) : null}
+
+          {community ? (
+            <p className="text-sm text-muted">
+              An editor accepted this from a public submission. It is on the atlas so people can find it — it has not
+              been reviewed in depth.
+            </p>
           ) : null}
         </div>
 

@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as ContributeRouteImport } from './routes/contribute'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ReviewRouteImport } from './routes/review'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
 import { Route as CountriesIso2RouteImport } from './routes/countries.$iso2'
 import { Route as SoftwareSlugRouteImport } from './routes/software.$slug'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,6 +32,16 @@ const AboutRoute = AboutRouteImport.update({
 const ContributeRoute = ContributeRouteImport.update({
   id: '/contribute',
   path: '/contribute',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewRoute = ReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
@@ -46,31 +59,45 @@ const SoftwareSlugRoute = SoftwareSlugRouteImport.update({
   path: '/software/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contribute': typeof ContributeRoute
+  '/login': typeof LoginRoute
+  '/review': typeof ReviewRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/countries/$iso2': typeof CountriesIso2Route
   '/software/$slug': typeof SoftwareSlugRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contribute': typeof ContributeRoute
+  '/login': typeof LoginRoute
+  '/review': typeof ReviewRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/countries/$iso2': typeof CountriesIso2Route
   '/software/$slug': typeof SoftwareSlugRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contribute': typeof ContributeRoute
+  '/login': typeof LoginRoute
+  '/review': typeof ReviewRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/countries/$iso2': typeof CountriesIso2Route
   '/software/$slug': typeof SoftwareSlugRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -78,34 +105,46 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/contribute'
+    | '/login'
+    | '/review'
     | '/companies/$slug'
     | '/countries/$iso2'
     | '/software/$slug'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/contribute'
+    | '/login'
+    | '/review'
     | '/companies/$slug'
     | '/countries/$iso2'
     | '/software/$slug'
+    | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/about'
     | '/contribute'
+    | '/login'
+    | '/review'
     | '/companies/$slug'
     | '/countries/$iso2'
     | '/software/$slug'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   ContributeRoute: typeof ContributeRoute
+  LoginRoute: typeof LoginRoute
+  ReviewRoute: typeof ReviewRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   CountriesIso2Route: typeof CountriesIso2Route
   SoftwareSlugRoute: typeof SoftwareSlugRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -131,6 +170,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContributeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review': {
+      id: '/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/companies/$slug': {
       id: '/companies/$slug'
       path: '/companies/$slug'
@@ -152,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SoftwareSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -159,9 +219,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   ContributeRoute: ContributeRoute,
+  LoginRoute: LoginRoute,
+  ReviewRoute: ReviewRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   CountriesIso2Route: CountriesIso2Route,
   SoftwareSlugRoute: SoftwareSlugRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

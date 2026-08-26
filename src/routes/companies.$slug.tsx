@@ -1,24 +1,24 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { ExternalLink } from "lucide-react";
-import {
-  ROLE_LABEL,
-  companyProducts,
-  countryName,
-  getCompany,
-} from "@/lib/catalog";
+import { ROLE_LABEL, companyProducts, countryName } from "@/lib/catalog";
+import { resolvePublicCompany } from "@/lib/accepted-records";
 import { initials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/companies/$slug")({
+  loader: async ({ params }) => {
+    const item = await resolvePublicCompany({ data: params.slug });
+    if (!item) throw notFound();
+    return { item };
+  },
   component: CompanyPage,
 });
 
 function CompanyPage() {
-  const { slug } = Route.useParams();
-  const item = getCompany(slug);
-  if (!item) throw notFound();
+  const { item } = Route.useLoaderData();
   const products = companyProducts(item);
+  const community = item.origin === "community";
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
@@ -38,7 +38,7 @@ function CompanyPage() {
         )}
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-faint">
-            {ROLE_LABEL[item.role] || item.role}
+            {community ? "Editor-accepted organisation" : ROLE_LABEL[item.role] || item.role}
           </p>
           <h1 className="mt-1 font-display text-4xl font-medium tracking-[-0.03em] sm:text-5xl">{item.name}</h1>
           <p className="mt-3 max-w-2xl text-lg leading-relaxed text-ink/85">
@@ -47,7 +47,13 @@ function CompanyPage() {
           <div className="mt-4 flex flex-wrap gap-1.5">
             {item.hq ? <Badge>{countryName(item.hq) || item.hq}</Badge> : null}
             {item.africaBuilt ? <Badge tone="quiet">Africa-headquartered</Badge> : null}
-            {item.tier === "reviewed" ? <Badge tone="reviewed">Reviewed</Badge> : <Badge tone="quiet">Catalogue</Badge>}
+            {community ? (
+              <Badge tone="ok">Editor accepted</Badge>
+            ) : item.tier === "reviewed" ? (
+              <Badge tone="reviewed">Reviewed</Badge>
+            ) : (
+              <Badge tone="quiet">Catalogue</Badge>
+            )}
             {item.roles.filter((r) => r !== item.role).map((r) => (
               <Badge key={r} tone="quiet">
                 {ROLE_LABEL[r] || r}
@@ -93,7 +99,11 @@ function CompanyPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted">No software records linked yet.</p>
+            <p className="text-sm text-muted">
+              {community
+                ? "Accepted from a public submission — no software records linked yet."
+                : "No software records linked yet."}
+            </p>
           )}
         </section>
         <aside className="space-y-6">

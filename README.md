@@ -17,7 +17,9 @@ One atlas. Four views of the same records.
 
 Click a country, a stage, a product or a company. Every object links to the others. Reviewed records (blue dot) carry sourced deployments. Catalogue coverage is labelled, not dressed up as evidence. Africa-wide tags are **not** painted onto every country.
 
-Anyone can [contribute](https://map.kaykluz.com/contribute) a product, company or correction. Editors review before publication. No paid ranking or paid inclusion.
+Anyone can [contribute](https://map.kaykluz.com/contribute) a product, company or correction. Editors sign in at `/login` and review the queue at `/review` before publication. No paid ranking or paid inclusion.
+
+This rebuild now includes that private editor workspace: allowlisted reviewers can accept, hold or reject submissions, and accepted records can appear on the public map.
 
 ## Data in this release
 

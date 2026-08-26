@@ -31,6 +31,10 @@ function AboutPage() {
             <strong>Blue dot</strong> — a reviewed record with sourced deployments. Everything else is catalogue coverage
             still being checked.
           </li>
+          <li>
+            <strong>Editor accepted</strong> — a public submission an editor published so it can be found. That is not
+            the same as a reviewed record.
+          </li>
         </ul>
       </section>
 

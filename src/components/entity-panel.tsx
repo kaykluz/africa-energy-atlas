@@ -22,6 +22,7 @@ import {
 import { initials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAcceptedCatalog, mergeBySlug } from "@/components/accepted-catalog";
 
 export function EntityPanel({
   softwareSlug,
@@ -38,8 +39,13 @@ export function EntityPanel({
   onOpenSoftware: (slug: string) => void;
   onOpenCompany: (slug: string) => void;
 }) {
-  const sw = softwareSlug ? softwareBySlug.get(softwareSlug) : undefined;
-  const co = companySlug ? companyBySlug.get(companySlug) : undefined;
+  const { software: extraSoftware, companies: extraCompanies } = useAcceptedCatalog();
+  const sw = softwareSlug
+    ? (softwareBySlug.get(softwareSlug) ?? extraSoftware.find((item) => item.slug === softwareSlug))
+    : undefined;
+  const co = companySlug
+    ? (companyBySlug.get(companySlug) ?? extraCompanies.find((item) => item.slug === companySlug))
+    : undefined;
   if (sw) return <SoftwarePreview item={sw} onClose={onClose} />;
   if (co) {
     return <CompanyPreview item={co} onClose={onClose} onOpenSoftware={onOpenSoftware} />;
@@ -99,7 +105,13 @@ function SoftwarePreview({ item, onClose }: { item: Software; onClose: () => voi
   const owner = item.companyId ? companyById.get(item.companyId) : undefined;
   return (
     <PanelShell
-      kicker={item.reviewed ? "Reviewed product" : "Catalogue product"}
+      kicker={
+        item.kind === "community_accepted"
+          ? "Editor-accepted product"
+          : item.reviewed
+            ? "Reviewed product"
+            : "Catalogue product"
+      }
       title={item.name}
       onClose={onClose}
       footer={
@@ -126,7 +138,13 @@ function SoftwarePreview({ item, onClose }: { item: Software; onClose: () => voi
       </div>
       <p className="mt-3 text-sm leading-relaxed text-ink/85">{item.summary || "No summary yet."}</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {item.reviewed ? <Badge tone="reviewed">Reviewed</Badge> : <Badge tone="quiet">Catalogue</Badge>}
+        {item.kind === "community_accepted" ? (
+          <Badge tone="ok">Editor accepted</Badge>
+        ) : item.reviewed ? (
+          <Badge tone="reviewed">Reviewed</Badge>
+        ) : (
+          <Badge tone="quiet">Catalogue</Badge>
+        )}
         {item.relationship ? <Badge tone="quiet">{relationshipName(item.relationship)}</Badge> : null}
         {item.stageIds.slice(0, 2).map((id) => (
           <Badge key={id} tone="quiet">
@@ -166,7 +184,7 @@ function CompanyPreview({
   const products = item.productIds.map((id) => softwareById.get(id)).filter(Boolean) as Software[];
   return (
     <PanelShell
-      kicker={ROLE_LABEL[item.role] || item.role}
+      kicker={item.origin === "community" ? "Editor-accepted organisation" : ROLE_LABEL[item.role] || item.role}
       title={item.name}
       onClose={onClose}
       footer={
@@ -180,6 +198,7 @@ function CompanyPreview({
       <p className="text-sm leading-relaxed text-ink/85">{item.summary || "Energy-sector organisation."}</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {item.hq ? <Badge>{countryName(item.hq) || item.hq}</Badge> : null}
+        {item.origin === "community" ? <Badge tone="ok">Editor accepted</Badge> : null}
         {item.africaBuilt ? <Badge tone="quiet">Africa-headquartered</Badge> : null}
         {products.length ? <Badge tone="quiet">{products.length} products</Badge> : null}
       </div>
@@ -214,13 +233,16 @@ function CountryPreview({
   onOpenSoftware: (slug: string) => void;
   onOpenCompany: (slug: string) => void;
 }) {
+  const { software: extraSoftware, companies: extraCompanies } = useAcceptedCatalog();
   const stat = countryStatByIso.get(iso);
-  const sw = softwareInCountry(iso).sort(
-    (a, b) => Number(b.reviewed) - Number(a.reviewed) || a.name.localeCompare(b.name),
-  );
-  const cos = companiesInCountry(iso).sort(
-    (a, b) => (b.productIds.length || 0) - (a.productIds.length || 0) || a.name.localeCompare(b.name),
-  );
+  const sw = mergeBySlug(
+    softwareInCountry(iso),
+    extraSoftware.filter((item) => item.countries.includes(iso)),
+  ).sort((a, b) => Number(b.reviewed) - Number(a.reviewed) || a.name.localeCompare(b.name));
+  const cos = mergeBySlug(
+    companiesInCountry(iso),
+    extraCompanies.filter((item) => item.countries.includes(iso) || item.hq === iso),
+  ).sort((a, b) => (b.productIds.length || 0) - (a.productIds.length || 0) || a.name.localeCompare(b.name));
   return (
     <PanelShell
       kicker="Country"

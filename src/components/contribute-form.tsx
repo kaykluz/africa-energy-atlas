@@ -36,6 +36,7 @@ export function ContributeForm({
           stageId: String(fd.get("stageId") ?? ""),
           summary: String(fd.get("summary") ?? ""),
           sourceUrl: String(fd.get("sourceUrl") ?? ""),
+          faxNumber: String(fd.get("fax_number") ?? ""),
         },
       });
       form.reset();
@@ -81,7 +82,13 @@ export function ContributeForm({
           </Button>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <form onSubmit={onSubmit} className="relative mt-8 space-y-4">
+          <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
+            <label>
+              Company fax
+              <input type="text" name="fax_number" tabIndex={-1} autoComplete="off" />
+            </label>
+          </div>
           <Field label={kind === "correction" ? "Record to correct" : "Name"} htmlFor="name">
             <Input
               id="name"
