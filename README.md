@@ -91,6 +91,11 @@ after a deploy, so there is no separate migrate step.
 npm run deploy
 ```
 
+Or let GitHub do it: add `CLOUDFLARE_API_TOKEN` (needs the *Cloudflare Pages —
+Edit* permission) and `CLOUDFLARE_ACCOUNT_ID` under Settings → Secrets and
+variables → Actions. `.github/workflows/deploy.yml` then ships every merge to
+`main`, and can be run by hand from the Actions tab.
+
 **3. Bind D1 and set the secrets** on the project (Cloudflare dashboard →
 Workers & Pages → your project → Settings), or from the CLI:
 
