@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useRouterState } from "@tanstack/react-router";
-import { GROK_PROVIDERS, authEnabled, signIn, signOut } from "@/lib/auth/client";
+import { MAGIC_LINK_MINUTES, SOCIAL_PROVIDERS, sendMagicLink, signIn, signOut } from "@/lib/auth/client";
+import { getSignInMethods, type SignInMethods } from "@/lib/sign-in-methods";
+import { Input } from "@/components/ui/input";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
   decideContribution,
@@ -78,44 +80,145 @@ export function EditorAccess() {
 }
 
 function EditorSignIn({ error }: { error: string }) {
+  const [methods, setMethods] = useState<SignInMethods | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [localError, setLocalError] = useState("");
+  const [email, setEmail] = useState("");
+  const [linkSent, setLinkSent] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getSignInMethods()
+      .then((next) => {
+        if (!cancelled) setMethods(next);
+      })
+      .catch(() => {
+        // Fall back to showing nothing rather than a button that cannot work.
+        if (!cancelled) setMethods({ google: false, magicLink: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const nothingConfigured = methods !== null && !methods.google && !methods.magicLink;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-16">
       <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-faint">Private</p>
       <h1 className="mt-2 font-display text-4xl font-medium tracking-[-0.03em]">Editor sign-in</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        This door is for allowlisted editors. The public map never links here. Sign in with the Google account on the
-        hosting allowlist — a cloned copy of the source cannot open the live workspace.
+        This door is for allowlisted editors. The public map never links here. Sign in with an account on the hosting
+        allowlist — a cloned copy of the source cannot open the live workspace.
       </p>
-      <div className="mt-8 space-y-2">
-        {authEnabled ? (
-          GROK_PROVIDERS.map((provider) => (
-            <Button
-              key={provider.providerId}
-              type="button"
-              variant={provider.idp === "google" ? "primary" : "secondary"}
-              className="w-full"
-              disabled={Boolean(busy)}
-              onClick={() => {
-                setBusy(provider.providerId);
-                setLocalError("");
-                void signIn(provider.providerId, { callbackURL: "/review", errorCallbackURL: "/review" }).catch(
-                  (err: unknown) => {
+
+      <div className="mt-8 space-y-3">
+        {methods === null ? (
+          <div className="h-10 animate-pulse rounded-lg bg-sunken" />
+        ) : null}
+
+        {methods?.google
+          ? SOCIAL_PROVIDERS.map((provider) => (
+              <Button
+                key={provider.providerId}
+                type="button"
+                variant="primary"
+                className="w-full"
+                disabled={Boolean(busy)}
+                onClick={() => {
+                  setBusy(provider.providerId);
+                  setLocalError("");
+                  void signIn(provider.providerId, {
+                    callbackURL: "/review",
+                    errorCallbackURL: "/login",
+                  }).catch((err: unknown) => {
                     setLocalError(err instanceof Error ? err.message : "Sign-in failed.");
                     setBusy(null);
-                  },
-                );
+                  });
+                }}
+              >
+                {busy === provider.providerId ? "Opening…" : `Continue with ${provider.label}`}
+              </Button>
+            ))
+          : null}
+
+        {methods?.google && methods?.magicLink ? (
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-line" />
+            <span className="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-faint">or</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+        ) : null}
+
+        {methods?.magicLink ? (
+          linkSent ? (
+            <div className="rounded-xl border border-line bg-sunken p-4">
+              <p className="text-sm font-semibold">Check your inbox</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                If {email.trim() || "that address"} is on the editor allowlist, a sign-in link is on its way. It works
+                once and expires in {MAGIC_LINK_MINUTES} minutes.
+              </p>
+              <button
+                type="button"
+                className="mt-3 cursor-pointer text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                onClick={() => {
+                  setLinkSent(false);
+                  setBusy(null);
+                }}
+              >
+                Use a different address
+              </button>
+            </div>
+          ) : (
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const address = email.trim();
+                if (!address) return;
+                setBusy("magic-link");
+                setLocalError("");
+                void sendMagicLink(address, { callbackURL: "/review" })
+                  .then(() => {
+                    setLinkSent(true);
+                    setBusy(null);
+                  })
+                  .catch((err: unknown) => {
+                    setLocalError(
+                      err instanceof Error ? err.message : "Could not send the sign-in link.",
+                    );
+                    setBusy(null);
+                  });
               }}
             >
-              {busy === provider.providerId ? "Opening…" : `Continue with ${provider.label}`}
-            </Button>
-          ))
-        ) : (
-          <p className="text-sm text-muted">Sign-in is disabled on this instance.</p>
-        )}
+              <label htmlFor="editor-email" className="block text-sm font-medium">
+                Email a sign-in link
+              </label>
+              <Input
+                id="editor-email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.org"
+                value={email}
+                disabled={Boolean(busy)}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <Button type="submit" variant="secondary" className="w-full" disabled={Boolean(busy)}>
+                {busy === "magic-link" ? "Sending…" : "Send the link"}
+              </Button>
+            </form>
+          )
+        ) : null}
+
+        {nothingConfigured ? (
+          <p className="text-sm text-muted">
+            Sign-in is not configured on this deployment. Set the Google OAuth or Resend secrets in the hosting
+            environment to open the workspace.
+          </p>
+        ) : null}
       </div>
+
       {localError || error ? <p className="mt-4 text-sm text-danger">{localError || error}</p> : null}
       <Link to="/" className="mt-8 text-sm font-semibold text-primary">
         Return to the map

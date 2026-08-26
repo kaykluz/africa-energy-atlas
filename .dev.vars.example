@@ -1,0 +1,24 @@
+# Copy to `.dev.vars` for local `wrangler dev`. Never commit the real file.
+# In production these are Cloudflare secrets (`wrangler secret put NAME`),
+# except REVIEWER_EMAILS which may be a plain var if you don't mind it being
+# readable in the dashboard.
+
+# Signs sessions. Generate with: openssl rand -hex 32
+BETTER_AUTH_SECRET=
+
+# The public origin. Must match how the browser reaches the app, or OAuth
+# redirects and the CSRF origin check will reject sign-in.
+BETTER_AUTH_URL=http://localhost:8787
+
+# Google sign-in. Create an OAuth client (type: Web application) at
+# https://console.cloud.google.com/apis/credentials and set the authorised
+# redirect URI to <BETTER_AUTH_URL>/api/auth/callback/google
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Magic-link sign-in over Resend. EMAIL_FROM's domain must be verified there.
+RESEND_API_KEY=
+EMAIL_FROM=Africa Energy Atlas <atlas@example.org>
+
+# Comma-separated editor allowlist. Empty on the deployed database = nobody.
+REVIEWER_EMAILS=you@example.org
