@@ -1,0 +1,53 @@
+name: Enrich organisation records
+
+on:
+  schedule:
+    # Weekly, Monday 03:20 UTC. Each run covers the stalest ENRICH_LIMIT
+    # subjects, so the whole catalogue rotates through on a steady cadence.
+    - cron: "20 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Subjects to fetch this run"
+        default: "250"
+
+concurrency:
+  group: enrich
+  cancel-in-progress: false
+
+jobs:
+  # Same posture as deploy.yml: without credentials this SKIPS with a notice,
+  # because a red main that nobody intends to fix teaches people to ignore red.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Enrichment skipped::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set. The token needs D1 read/write."
+          fi
+
+  enrich:
+    needs: guard
+    if: needs.guard.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Crawl the stalest subjects
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ENRICH_LIMIT: ${{ inputs.limit || '250' }}
+        run: node --experimental-strip-types scripts/enrich.mjs
