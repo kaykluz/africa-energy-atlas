@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { editorMiddleware } from "@/lib/editor-gate";
 import { getCompany } from "@/lib/catalog";
+import { findDuplicates, type DuplicateMatch } from "@/lib/duplicates";
 
 /**
  * The organisation review queue.
@@ -44,9 +45,23 @@ export type OrganisationCandidate = {
   reviewedByEmail: string;
 };
 
+/** A likely duplicate of a queued candidate, for an editor to confirm. */
+export type DuplicateSuggestion = {
+  id: string;
+  name: string;
+  countries: string[];
+  roleIds: string[];
+  status: OrganisationStatus;
+  sourceUrl: string;
+  reason: DuplicateMatch["reason"];
+  detail: string;
+};
+
 export type OrganisationQueue = {
   items: OrganisationCandidate[];
   counts: Record<OrganisationStatus | "all" | "flagged", number>;
+  /** Keyed by candidate id. Absent means nothing similar was found. */
+  duplicates: Record<string, DuplicateSuggestion[]>;
 };
 
 type Row = {
@@ -165,7 +180,132 @@ export const listOrganisationQueue = createServerFn({ method: "GET" })
       if (key in counts) counts[key] = Number(row.n);
       counts.all += Number(row.n);
     }
-    return { items: rows.map(mapRow), counts };
+    const items = rows.map(mapRow);
+
+    // Compare the page against every candidate, not just the page: a duplicate
+    // is very often in a different batch, which is exactly why intake dedupe
+    // did not catch it. The projection is deliberately narrow so scanning the
+    // full set stays cheap.
+    const all = await sql<{
+      id: string; name: string; countries: string; website: string;
+      role_ids: string; status: string; source_url: string;
+    }>`
+      select id, name, countries, website, role_ids, status, source_url
+      from organisation_candidates
+      where status <> ${"duplicate"} and status <> ${"rejected"}
+    `;
+    const pool = all.map((row) => ({
+      id: row.id,
+      name: row.name,
+      countries: list(row.countries),
+      website: row.website ?? "",
+    }));
+    const byId = new Map(all.map((row) => [row.id, row]));
+
+    const duplicates: Record<string, DuplicateSuggestion[]> = {};
+    for (const item of items) {
+      const matches = findDuplicates(
+        { id: item.id, name: item.name, countries: item.countries, website: item.website },
+        pool,
+      );
+      if (!matches.length) continue;
+      duplicates[item.id] = matches.flatMap((match) => {
+        const other = byId.get(match.otherId);
+        if (!other) return [];
+        return [{
+          id: other.id,
+          name: other.name,
+          countries: list(other.countries),
+          roleIds: list(other.role_ids),
+          status: (STATUSES.includes(other.status as OrganisationStatus)
+            ? other.status
+            : "received") as OrganisationStatus,
+          sourceUrl: other.source_url ?? "",
+          reason: match.reason,
+          detail: match.detail,
+        }];
+      });
+    }
+
+    return { items, counts, duplicates };
+  });
+
+const mergeSchema = z.object({
+  survivorId: z.string().trim().min(3).max(120),
+  duplicateId: z.string().trim().min(3).max(120),
+  version: z.number().int().positive().max(1_000_000),
+});
+
+/**
+ * Fold one candidate into another.
+ *
+ * The survivor gains the union of countries, roles and segments, and the
+ * duplicate's source is appended to its evidence rather than discarded — two
+ * independent sources naming the same firm is stronger evidence than either
+ * alone, and losing one would quietly weaken the record. The duplicate is
+ * marked, never deleted, so the decision stays auditable and reversible.
+ */
+export const mergeOrganisations = createServerFn({ method: "POST" })
+  .middleware([editorMiddleware])
+  .validator((data: unknown) => mergeSchema.parse(data))
+  .handler(async ({ context, data }): Promise<OrganisationCandidate> => {
+    if (data.survivorId === data.duplicateId) {
+      throw new Error("A record cannot be merged into itself.");
+    }
+    const sql = await getSql();
+    const survivorRows = await sql.query<Row>(`${SELECT} where id = $1 limit 1`, [data.survivorId]);
+    const dupRows = await sql.query<Row>(`${SELECT} where id = $1 limit 1`, [data.duplicateId]);
+    const survivor = survivorRows[0];
+    const duplicate = dupRows[0];
+    if (!survivor || !duplicate) throw new Error("One of those records is no longer in the queue.");
+    if (Number(survivor.version) !== data.version) {
+      throw new Error("This record was updated in another session. Refresh and try again.");
+    }
+
+    const union = (a: string, b: string) =>
+      Array.from(new Set([...list(a), ...list(b)])).join(",");
+
+    const note = [survivor.evidence_note, duplicate.evidence_note]
+      .map((text) => (text ?? "").trim())
+      .filter(Boolean)
+      .join(" — also: ")
+      .slice(0, 1000);
+
+    await sql`
+      update organisation_candidates
+      set countries = ${union(survivor.countries, duplicate.countries)},
+          role_ids = ${union(survivor.role_ids, duplicate.role_ids)},
+          segment_ids = ${union(survivor.segment_ids, duplicate.segment_ids)},
+          website = ${survivor.website || duplicate.website || ""},
+          evidence_note = ${note},
+          flagged_personal = ${Number(survivor.flagged_personal) || Number(duplicate.flagged_personal) ? 1 : 0},
+          version = ${Number(survivor.version) + 1}
+      where id = ${data.survivorId} and version = ${data.version}
+    `;
+
+    await sql`
+      update organisation_candidates
+      set status = ${"duplicate"},
+          note = ${`Merged into ${survivor.name}`},
+          slug = ${""},
+          version = ${Number(duplicate.version) + 1},
+          reviewed_by_user_id = ${context.userId},
+          reviewed_by_email = ${context.email},
+          reviewed_at = ${new Date().toISOString()}
+      where id = ${data.duplicateId}
+    `;
+
+    const auditId = `om_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    await sql`
+      insert into contribution_audit
+        (id, contribution_id, actor_user_id, actor_email, action, from_status, to_status, note)
+      values (${auditId}, ${data.duplicateId}, ${context.userId}, ${context.email},
+              ${"duplicate"}, ${duplicate.status}, ${"duplicate"},
+              ${`Merged into ${survivor.name} (${data.survivorId})`})
+    `;
+
+    const updated = await sql.query<Row>(`${SELECT} where id = $1 limit 1`, [data.survivorId]);
+    return mapRow(updated[0]!);
   });
 
 const decideSchema = z.object({

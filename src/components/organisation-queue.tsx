@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   decideOrganisation,
   listOrganisationQueue,
+  mergeOrganisations,
+  type DuplicateSuggestion,
   type OrganisationCandidate,
   type OrganisationQueue as Queue,
   type OrganisationStatus,
@@ -49,6 +51,7 @@ export function OrganisationQueue() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [merging, setMerging] = useState<string | null>(null);
   const [sourceOpened, setSourceOpened] = useState(false);
   const [note, setNote] = useState("");
 
@@ -111,6 +114,26 @@ export function OrganisationQueue() {
       setBusy(false);
     }
   }
+
+  async function merge(duplicateId: string) {
+    if (!selected) return;
+    setMerging(duplicateId);
+    try {
+      await mergeOrganisations({
+        data: { survivorId: selected.id, duplicateId, version: selected.version },
+      });
+      await refresh();
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That merge could not be saved.");
+    } finally {
+      setMerging(null);
+    }
+  }
+
+  const suggestions: DuplicateSuggestion[] = selected
+    ? (snapshot?.duplicates?.[selected.id] ?? [])
+    : [];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -198,6 +221,11 @@ export function OrganisationQueue() {
                         name may be a person
                       </span>
                     ) : null}
+                    {snapshot?.duplicates?.[item.id]?.length ? (
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[0.6rem] font-semibold text-primary">
+                        possible duplicate
+                      </span>
+                    ) : null}
                   </span>
                 </button>
               </li>
@@ -241,6 +269,50 @@ export function OrganisationQueue() {
                 >
                   Open the source →
                 </a>
+              ) : null}
+
+              {suggestions.length ? (
+                <section className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                  <h3 className="text-sm font-semibold">
+                    Possible duplicate{suggestions.length > 1 ? "s" : ""}
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    Merging keeps this record, adds the other’s countries, roles and evidence, and
+                    marks it a duplicate. Nothing is deleted. Check the names first — a shared
+                    website is a hint, not proof.
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {suggestions.map((match) => (
+                      <li key={match.id} className="rounded-md bg-surface p-2.5">
+                        <p className="text-sm font-semibold">{match.name}</p>
+                        <p className="mt-0.5 text-xs text-muted">{match.detail}</p>
+                        <p className="mt-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-faint">
+                          {match.countries.join(" · ")} · {match.status}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {match.sourceUrl ? (
+                            <a
+                              href={match.sourceUrl}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                            >
+                              Its source →
+                            </a>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={busy || merging !== null}
+                            onClick={() => merge(match.id)}
+                          >
+                            {merging === match.id ? "Merging…" : "Merge into this record"}
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ) : null}
 
               <label className="mt-4 block text-sm font-medium">
