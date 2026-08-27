@@ -255,10 +255,13 @@ function CompanyCard({ item, onOpen }: { item: Company; onOpen: (slug: string) =
           <img
             src={item.logo}
             alt=""
+            title={`${item.name} identity`}
             className="size-10 rounded-md bg-sunken object-contain p-1"
           />
         ) : (
-          <span className="mark-disc size-10 shrink-0 text-sm">{initials(item.name)}</span>
+          <span className="mark-disc size-10 shrink-0 text-sm" title="Logo not yet added">
+            {initials(item.name)}
+          </span>
         )}
         <div className="min-w-0">
           <h3 className="truncate font-semibold leading-tight">{item.name}</h3>
