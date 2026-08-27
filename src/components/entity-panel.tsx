@@ -21,6 +21,13 @@ import {
 } from "@/lib/catalog";
 import { initials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  companyPresence,
+  presenceDetail,
+  presenceShortLabel,
+  productLogo,
+  softwarePresence,
+} from "@/lib/presence";
 import { Button } from "@/components/ui/button";
 import { useAcceptedCatalog, mergeBySlug } from "@/components/accepted-catalog";
 
@@ -110,7 +117,7 @@ function SoftwarePreview({ item, onClose }: { item: Software; onClose: () => voi
           ? "Editor-accepted product"
           : item.reviewed
             ? "Reviewed product"
-            : "Catalogue product"
+            : "Directory listing"
       }
       title={item.name}
       onClose={onClose}
@@ -123,7 +130,18 @@ function SoftwarePreview({ item, onClose }: { item: Software; onClose: () => voi
       }
     >
       <div className="flex items-center gap-3">
-        <span className="mark-disc size-12 text-sm">{initials(item.name)}</span>
+        {productLogo(item, owner?.logo) ? (
+          <img
+            src={productLogo(item, owner?.logo)}
+            alt=""
+            title={item.logo ? `${item.name} identity` : `${owner?.name ?? "Owner"} identity, inherited`}
+            className="size-12 rounded-md bg-sunken object-contain p-1"
+          />
+        ) : (
+          <span className="mark-disc size-12 text-sm" title="Logo not yet added">
+            {initials(item.name)}
+          </span>
+        )}
         {owner ? (
           <Link
             to="/companies/$slug"
@@ -143,7 +161,9 @@ function SoftwarePreview({ item, onClose }: { item: Software; onClose: () => voi
         ) : item.reviewed ? (
           <Badge tone="reviewed">Reviewed</Badge>
         ) : (
-          <Badge tone="quiet">Catalogue</Badge>
+          <Badge tone="quiet" title="Listed from a named source; not reviewed in depth">
+            Directory listing
+          </Badge>
         )}
         {item.relationship ? <Badge tone="quiet">{relationshipName(item.relationship)}</Badge> : null}
         {item.stageIds.slice(0, 2).map((id) => (
@@ -276,7 +296,13 @@ function CountryPreview({
                   className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-sunken"
                 >
                   {item.reviewed ? <i className="reviewed-dot" /> : null}
-                  <span className="truncate text-sm font-semibold">{item.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{item.name}</span>
+                  <span
+                    className="shrink-0 text-[0.7rem] text-faint"
+                    title={presenceDetail(softwarePresence(item, iso))}
+                  >
+                    {presenceShortLabel(softwarePresence(item, iso))}
+                  </span>
                 </button>
               </li>
             ))}
@@ -294,8 +320,16 @@ function CountryPreview({
                   onClick={() => onOpenCompany(item.slug)}
                   className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left hover:bg-sunken"
                 >
-                  <span className="truncate text-sm font-semibold">{item.name}</span>
-                  <span className="shrink-0 text-[0.7rem] text-faint">{ROLE_LABEL[item.role]}</span>
+                  <span className="min-w-0 truncate text-sm font-semibold">{item.name}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-[0.7rem]">
+                    <span
+                      className="text-faint"
+                      title={presenceDetail(companyPresence(item, iso))}
+                    >
+                      {presenceShortLabel(companyPresence(item, iso))}
+                    </span>
+                    <span className="text-muted">{ROLE_LABEL[item.role]}</span>
+                  </span>
                 </button>
               </li>
             ))}
