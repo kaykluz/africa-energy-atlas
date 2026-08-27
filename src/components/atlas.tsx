@@ -8,6 +8,7 @@ import { AfricaMap } from "@/components/africa-map";
 import { ValueChain } from "@/components/value-chain";
 import { CompanyGrid, SoftwareGrid } from "@/components/browse";
 import { EntityPanel } from "@/components/entity-panel";
+import { useMergedCounts } from "@/components/accepted-catalog";
 import { cn } from "@/lib/utils";
 
 export function AtlasPage() {
@@ -182,7 +183,9 @@ function LayerBtn({
 }
 
 function MapIdle({ layer }: { layer: MapLayer }) {
-  const { counts } = catalog;
+  // Derived from the merged catalogue, so records accepted in /review are
+  // counted the moment they are accepted rather than at the next rebuild.
+  const counts = useMergedCounts(catalog.counts, catalog.software, catalog.companies);
   return (
     <div className="flex h-full flex-col justify-between p-5 md:p-6">
       <div>
