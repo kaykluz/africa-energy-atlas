@@ -5,6 +5,7 @@ import { Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { MAGIC_LINK_MINUTES, SOCIAL_PROVIDERS, sendMagicLink, signIn, signOut } from "@/lib/auth/client";
 import { getSignInMethods, type SignInMethods } from "@/lib/sign-in-methods";
 import { Input } from "@/components/ui/input";
+import { OrganisationQueue } from "@/components/organisation-queue";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
   decideContribution,
@@ -258,6 +259,10 @@ function EditorDenied({ email }: { email: string | null }) {
 }
 
 function ReviewWorkspace({ session }: { session: EditorSession }) {
+  // Two queues share this workspace: public form submissions, and organisation
+  // candidates swept from regulator registers. They are separate tables because
+  // only the second carries roles and segments.
+  const [tab, setTab] = useState<"contributions" | "organisations">("contributions");
   const [snapshot, setSnapshot] = useState<QueueSnapshot | null>(null);
   const [loadError, setLoadError] = useState("");
   const [filter, setFilter] = useState<"all" | ContributionStatus>("received");
@@ -310,7 +315,28 @@ function ReviewWorkspace({ session }: { session: EditorSession }) {
         </p>
       ) : null}
 
-      {snapshot ? (
+      <div className="mt-6 flex gap-1.5">
+        {([
+          ["contributions", "Contributions"],
+          ["organisations", "Organisations"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              "rounded-full px-4 py-2 text-sm font-semibold",
+              tab === id ? "bg-ink text-surface" : "bg-sunken text-muted hover:text-ink",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "organisations" ? <OrganisationQueue /> : null}
+
+      {tab === "contributions" && snapshot ? (
         <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Stat n={snapshot.counts.received} label="Inbox" />
           <Stat n={snapshot.counts.needs_evidence} label="Held" />
@@ -318,13 +344,20 @@ function ReviewWorkspace({ session }: { session: EditorSession }) {
           <Stat n={snapshot.counts.rejected} label="Rejected" />
           <Stat n={snapshot.counts.all} label="Total" />
         </dl>
-      ) : (
+      ) : tab === "contributions" ? (
         <div className="mt-6 h-20 animate-pulse rounded-xl bg-sunken" />
-      )}
+      ) : null}
 
-      {loadError ? <p className="mt-4 text-sm text-danger">{loadError}</p> : null}
+      {tab === "contributions" && loadError ? (
+        <p className="mt-4 text-sm text-danger">{loadError}</p>
+      ) : null}
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+      <div
+        className={cn(
+          "mt-6 min-h-0 flex-1 flex-col gap-4 lg:flex-row",
+          tab === "contributions" ? "flex" : "hidden",
+        )}
+      >
         <section className="flex min-h-0 flex-1 flex-col rounded-xl bg-surface shadow-soft lg:max-w-[420px]">
           <div className="border-b border-line p-3">
             <input

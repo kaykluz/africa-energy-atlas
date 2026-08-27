@@ -84,6 +84,60 @@ export function acceptedToCompany(row: AcceptedRow): Company {
   };
 }
 
+/** An accepted organisation candidate, shaped as a public company record. */
+type AcceptedOrgRow = {
+  id: string; name: string; website: string; countries: string;
+  role_ids: string; evidence_note: string; source_url: string;
+  slug: string; reviewed_at: unknown;
+};
+
+/** Map the atlas role vocabulary onto the coarse `role` the map colours by. */
+function roleFor(roleIds: string[]): string {
+  if (roleIds.some((r) => r.startsWith("org_role_epc") || r.includes("installer") || r.includes("system_integrator"))) return "epc";
+  if (roleIds.some((r) => r.includes("developer_ipp") || r.includes("asset_portfolio"))) return "developer";
+  if (roleIds.some((r) => r.includes("om_asset_manager") || r.includes("energy_service"))) return "operator";
+  if (roleIds.some((r) => r.includes("equipment_supplier") || r.includes("distributor"))) return "oem";
+  return "enabler";
+}
+
+export function acceptedOrgToCompany(row: AcceptedOrgRow): Company {
+  const countries = (row.countries || "")
+    .split(",").map((c) => c.trim().toUpperCase()).filter(Boolean);
+  const roleIds = (row.role_ids || "").split(",").map((r) => r.trim()).filter(Boolean);
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    summary: row.evidence_note,
+    website: row.website ?? "",
+    role: roleFor(roleIds),
+    roles: [roleFor(roleIds)],
+    hq: countries[0] ?? "",
+    countries,
+    africaWide: false,
+    origin: "community",
+    africaBuilt: false,
+    // Editor-accepted from a research sweep. Never `reviewed`: an editor
+    // confirmed the source names the company, not that the profile is verified.
+    tier: "catalogue",
+    lifecycle: "active",
+    sourceUrl: row.source_url ?? "",
+    productIds: [],
+  };
+}
+
+async function loadAcceptedOrganisations(): Promise<Company[]> {
+  const sql = await getSql();
+  const rows = await sql<AcceptedOrgRow>`
+    select id, name, website, countries, role_ids, evidence_note, source_url, slug, reviewed_at
+    from organisation_candidates
+    where status = ${"accepted"} and slug <> ${""}
+    order by reviewed_at desc
+    limit 5000
+  `;
+  return rows.map(acceptedOrgToCompany);
+}
+
 async function loadAccepted(): Promise<AcceptedRow[]> {
   const sql = await getSql();
   return sql<AcceptedRow>`
@@ -105,6 +159,16 @@ export const listAcceptedRecords = createServerFn({ method: "GET" }).handler(asy
     if (!row.slug) continue;
     if (row.kind === "software" && !getSoftware(row.slug)) software.push(acceptedToSoftware(row));
     if (row.kind === "company" && !getCompany(row.slug)) companies.push(acceptedToCompany(row));
+  }
+  // Organisations accepted in the review queue are public companies too. Both
+  // sources are deduplicated against the built catalogue by slug, so a record
+  // already shipped in catalog.json is never counted or listed twice.
+  const seen = new Set(companies.map((c) => c.slug));
+  for (const org of await loadAcceptedOrganisations()) {
+    if (!seen.has(org.slug) && !getCompany(org.slug)) {
+      companies.push(org);
+      seen.add(org.slug);
+    }
   }
   return { software, companies };
 });
