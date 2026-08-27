@@ -37,6 +37,21 @@ Dataset licence: [CC BY 4.0](https://github.com/kaykluz/africa-energy-software-m
 - Notes: [kaykluz.com](https://kaykluz.com)
 - Source dataset: [africa-energy-software-map](https://github.com/kaykluz/africa-energy-software-map)
 
+## Regenerating the catalogue
+
+`src/data/catalog.json` is a build artefact. The dataset itself lives in
+[`kaykluz/africa-energy-software-map`](https://github.com/kaykluz/africa-energy-software-map);
+this repository renders it. After records are reviewed and released there,
+regenerate the catalogue with a checkout of that repository:
+
+```bash
+python3 scripts/build-catalog.py --src ../africa-energy-software-map
+```
+
+`--src` may also be given as `AESM_SRC`, and `--out` (or `ATLAS_OUT`) writes
+somewhere other than `src/data`. Running it against an unchanged dataset
+reproduces the current file byte for byte, so it is safe to run to check.
+
 ## Running it
 
 Requires Node 22.13+.

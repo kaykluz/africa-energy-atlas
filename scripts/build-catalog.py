@@ -2,16 +2,52 @@
 """Build a slim, linked catalog from the existing AESM datasets."""
 from __future__ import annotations
 
+import argparse
 import csv
 import glob
 import json
+import os
 import re
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
-SRC = Path("/tmp/aesm")
-OUT = Path("/workspace/src/data")
+# Where the source dataset and the output live.
+#
+# Both were hardcoded to the sandbox this script was first written in
+# (`/tmp/aesm`, `/workspace/src/data`), which meant it could not run anywhere
+# else — including a normal checkout of this repository. They are now
+# overridable, in this order: CLI flag, environment variable, then the previous
+# default. `--out` additionally falls back to this repo's own `src/data`, which
+# is where `/workspace/src/data` pointed in that sandbox, so an unflagged run
+# behaves as it always did.
+_parser = argparse.ArgumentParser(
+    description="Build the atlas catalog from an africa-energy-software-map checkout.",
+)
+_parser.add_argument(
+    "--src", default=os.environ.get("AESM_SRC"),
+    help="Path to an africa-energy-software-map checkout (env: AESM_SRC).",
+)
+_parser.add_argument(
+    "--out", default=os.environ.get("ATLAS_OUT"),
+    help="Directory to write catalog.json into (env: ATLAS_OUT).",
+)
+_args = _parser.parse_args()
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC = Path(_args.src) if _args.src else Path("/tmp/aesm")
+OUT = Path(_args.out) if _args.out else (
+    Path("/workspace/src/data") if Path("/workspace/src/data").parent.exists()
+    else REPO_ROOT / "src" / "data"
+)
+
+if not SRC.exists():
+    raise SystemExit(
+        f"source checkout not found: {SRC}\n"
+        "Pass --src /path/to/africa-energy-software-map (or set AESM_SRC).\n"
+        "This script reads the released dataset, taxonomy and organisation "
+        "catalogue from that repository; it does not generate them."
+    )
 RELEASE = SRC / "data/releases/0.2.0/batch-001"
 SNAP = SRC / "web/generated/registry-snapshot.json"
 ORG_CAT = SRC / "web/generated/organisation-catalogue.json"
