@@ -2,6 +2,7 @@ import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { ExternalLink } from "lucide-react";
 import { ROLE_LABEL, companyProducts, countryName } from "@/lib/catalog";
 import { resolvePublicCompany } from "@/lib/accepted-records";
+import { listSubjectSources, type PublicSource } from "@/lib/enrichment";
 import { initials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,13 +11,21 @@ export const Route = createFileRoute("/companies/$slug")({
   loader: async ({ params }) => {
     const item = await resolvePublicCompany({ data: params.slug });
     if (!item) throw notFound();
-    return { item };
+    // The evidence trail is additive: a database hiccup must degrade to an
+    // empty Sources section, never take the profile down with it.
+    let sources: PublicSource[] = [];
+    try {
+      sources = await listSubjectSources({ data: { subjectId: item.id } });
+    } catch {
+      sources = [];
+    }
+    return { item, sources };
   },
   component: CompanyPage,
 });
 
 function CompanyPage() {
-  const { item } = Route.useLoaderData();
+  const { item, sources } = Route.useLoaderData();
   const products = companyProducts(item);
   const community = item.origin === "community";
 
@@ -103,6 +112,42 @@ function CompanyPage() {
               {community
                 ? "Accepted from a public submission — no software records linked yet."
                 : "No software records linked yet."}
+            </p>
+          )}
+          <h2 className="mb-4 mt-10 font-display text-2xl font-medium">Sources</h2>
+          {sources.length ? (
+            <ul className="space-y-2">
+              {sources.map((source) => (
+                <li key={source.url} className="rounded-xl bg-surface p-4 shadow-soft">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="min-w-0 truncate font-semibold underline-offset-4 hover:underline"
+                    >
+                      {source.title || source.publisher || source.url}
+                    </a>
+                    <span
+                      className="font-mono text-[0.62rem] uppercase tracking-wide text-faint"
+                      title={source.tierLabel}
+                    >
+                      Tier {source.tier}
+                      {source.state !== "live" ? ` · ${source.state}` : ""}
+                      {source.lastFetched ? ` · checked ${source.lastFetched}` : ""}
+                    </span>
+                  </div>
+                  {source.excerpt ? (
+                    <p className="mt-1 line-clamp-2 text-sm text-muted">{source.excerpt}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted">
+              No fetched sources yet. The enrichment crawler visits each recorded website on a
+              rotating schedule; tiers follow the project&rsquo;s evidence policy, where volume
+              never substitutes for source quality.
             </p>
           )}
         </section>

@@ -50,6 +50,7 @@ test("this workspace's migrations are all picked up, in order", () => {
     "0002_contributions.sql",
     "0003_review.sql",
     "0004_organisation_candidates.sql",
+    "0005_enrichment.sql",
   ]);
 });
 
@@ -60,5 +61,6 @@ test("an applied migration drops out of the plan", () => {
     "0002_contributions.sql",
     "0003_review.sql",
     "0004_organisation_candidates.sql",
+    "0005_enrichment.sql",
   ]);
 });
