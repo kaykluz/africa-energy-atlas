@@ -202,5 +202,15 @@ export const resolvePublicCompany = createServerFn({ method: "GET" })
       limit 1
     `;
     const row = rows[0];
-    return row ? acceptedToCompany(row) : null;
+    if (row) return acceptedToCompany(row);
+    // Organisations accepted in the review queue are public companies too, so
+    // their detail pages must resolve; without this they list but 404 on click.
+    const orgs = await sql<AcceptedOrgRow>`
+      select id, name, website, countries, role_ids, evidence_note, source_url, slug, reviewed_at
+      from organisation_candidates
+      where status = ${"accepted"} and slug = ${slug}
+      limit 1
+    `;
+    const org = orgs[0];
+    return org ? acceptedOrgToCompany(org) : null;
   });
